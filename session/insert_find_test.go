@@ -29,6 +29,12 @@ func TestSession_Insert(t *testing.T) {
 
 	_ = session.Find(&p)
 
-	fmt.Println(p)
+	upd := make(map[string]interface{})
+	upd["Name"] = "hhhhh"
+	_, _ = session.Where("Name='Eric'").Update(upd)
+	_, _ = session.Where("Name='wda'").Delete()
+	count, _ := session.Count()
+
+	fmt.Println(p, count)
 	_ = session.DropTable()
 }
