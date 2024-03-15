@@ -13,12 +13,22 @@ import (
 
 type Session struct {
 	db       *sql.DB
+	tx       *sql.Tx
 	dialect  dialect.Dialect
 	refTable *schema.Schema
 	sql      strings.Builder
 	sqlVal   []interface{}
 	clause   clause.Clause
 }
+
+type CommonDB interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+var _ CommonDB = (*sql.DB)(nil)
+var _ CommonDB = (*sql.Tx)(nil)
 
 func New(db *sql.DB, dialect dialect.Dialect) *Session {
 	return &Session{db: db, dialect: dialect}
@@ -30,7 +40,10 @@ func (s *Session) ClearSQL() {
 	s.clause = clause.Clause{}
 }
 
-func (s *Session) DB() *sql.DB {
+func (s *Session) DB() CommonDB {
+	if s.tx != nil {
+		return s.tx
+	}
 	return s.db
 }
 
@@ -44,7 +57,7 @@ func (s *Session) Raw(sq string, value []interface{}) *Session {
 
 // Exec 函数是用来实现用户的一些相关的操作的处理函数
 func (s *Session) Exec() (sql.Result, error) {
-	result, err := s.db.Exec(s.sql.String(), s.sqlVal...)
+	result, err := s.DB().Exec(s.sql.String(), s.sqlVal...)
 	defer s.ClearSQL()
 	log.Info(s.sql.String(), s.sqlVal)
 	if err != nil {
@@ -55,14 +68,14 @@ func (s *Session) Exec() (sql.Result, error) {
 }
 
 func (s *Session) QueryRow() *sql.Row {
-	query := s.db.QueryRow(s.sql.String(), s.sqlVal...)
+	query := s.DB().QueryRow(s.sql.String(), s.sqlVal...)
 	defer s.ClearSQL()
 	log.Info(s.sql.String(), s.sqlVal)
 	return query
 }
 
 func (s *Session) QueryRows() (*sql.Rows, error) {
-	query, err := s.db.Query(s.sql.String(), s.sqlVal...)
+	query, err := s.DB().Query(s.sql.String(), s.sqlVal...)
 	defer s.ClearSQL()
 	log.Info(s.sql.String(), s.sqlVal)
 	if err != nil {
